@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Venom-Finance v2
 
 pragma solidity >=0.8.14;
 
@@ -7,6 +8,7 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+
 
 contract VShareRewardPool  is Initializable, OwnableUpgradeable  {
     using SafeMath for uint256;
@@ -50,8 +52,6 @@ contract VShareRewardPool  is Initializable, OwnableUpgradeable  {
     uint256 public tSharePerSecond; // 60000 SYMBIOT / (370 days * 24h * 60min * 60s)
     uint256 public runningTime; // 370 days
     uint256 public TOTAL_REWARDS;
-    bool public feeCheckerFunctionsDisabled;
-    bool public feeChecker;
     bool public ReentrantOn; 
     bool public isHumanOn; 
     uint256 private constant _NOT_ENTERED = 1;
@@ -265,27 +265,6 @@ contract VShareRewardPool  is Initializable, OwnableUpgradeable  {
     }
 
 
-
-
-    modifier disableFeeChecker() {
-            require(!feeCheckerFunctionsDisabled, "function is permantly disabled!" )  ;
-            _;
-        }
-    
-    // disable the function setFeeChecker
-    function disableFeeCheckerFunctions() public onlyOwner { 
-            feeCheckerFunctionsDisabled = true; 
-        }
-
-
-   
-    // This function cant be used if feeCheckerFunctionsDisabled is set to true, cause of the modifier disableFeeChecker
-    // There is no way to set it to flase post launch
-
-    function setFeeChecker(bool falseForOn) public onlyOwner disableFeeChecker  { 
-        feeChecker = falseForOn; 
-        }
-    
     // Deposit LP tokens.
     function deposit(uint256 _pid, uint256 _amount) public isHuman nonReentrant{
         address _sender = msg.sender;
@@ -293,18 +272,7 @@ contract VShareRewardPool  is Initializable, OwnableUpgradeable  {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_sender];
         updatePool(_pid);
-
-    if (feeChecker == false){
-
-    // Sends 1000 wei from user to user testing for fee with balanceOf
-    
-    uint256 _totalTokenBefore = IERC20(pool.token).balanceOf(msg.sender); 
-    pool.token.safeTransferFrom(msg.sender, msg.sender, 1000);
-    uint256 _totalTokenAfter = IERC20(pool.token).balanceOf(msg.sender);
-    require(_totalTokenBefore == _totalTokenAfter, "token with fees not allowed!" );
-        }
-
-    
+  
 
         if (user.amount > 0) {
             uint256 _pending = user.amount.mul(pool.accSymbiotPerShare).div(1e18).sub(user.rewardDebt);

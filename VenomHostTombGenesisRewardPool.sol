@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// Venom-Finance v2
 
 pragma solidity >=0.8.14;
 
@@ -10,9 +11,31 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 // Note that this pool has no minter key of HOST (rewards).
 // Instead, the governance will call HOST distributeReward method and send reward to this pool at the beginning.
+
+
+// Note that this pool has no minter key of HOST (rewards).
+// Instead, the governance will call HOST distributeReward method and send reward to this pool at the beginning.
 contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
+
+    // governance
+    address public operator;
+
+    // Info of each user.
+    struct UserInfo {
+        uint256 amount; // How many tokens the user has provided.
+        uint256 rewardDebt; // Reward debt. See explanation below.
+    }
+
+    // Info of each pool.
+    struct PoolInfo {
+        IERC20 token; // Address of LP token contract.
+        uint256 allocPoint; // How many allocation points assigned to this pool. HOST to distribute.
+        uint256 lastRewardTime; // Last time that HOST distribution occurs.
+        uint256 accHOSTPerShare; // Accumulated HOST per share, times 1e18. See below.
+        bool isStarted; // if lastRewardBlock has passed
+    }
 
 
 // Reentrant guard
@@ -41,25 +64,6 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
         // https://eips.ethereum.org/EIPS/eip-2200)
         _status = _NOT_ENTERED;
     }
-    // governance
-    address public operator;
-    address public feeAddress;
-
-    // Info of each user.
-    struct UserInfo {
-        uint256 amount; // How many tokens the user has provided.
-        uint256 rewardDebt; // Reward debt. See explanation below.
-    }
-
-    // Info of each pool.
-    struct PoolInfo {
-        IERC20 token; // Address of LP token contract.
-        uint256 allocPoint; // How many allocation points assigned to this pool. HOST to distribute.
-        uint256 lastRewardTime; // Last time that HOST distribution occurs.
-        uint16  depositFeeBP; //depositfee
-        uint256 accHOSTPerShare; // Accumulated HOST per share, times 1e18. See below.
-        bool isStarted; // if lastRewardBlock has passed
-    }
 
     IERC20 public HOST;
     address public cake;
@@ -71,7 +75,7 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
 
     // Total allocation points. Must be the sum of all allocation points in all pools.
-    uint256 public totalAllocPoint;
+    uint256 public totalAllocPoint = 0;
 
     // The time when HOST mining starts.
     uint256 public poolStartTime;
@@ -79,26 +83,11 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
     // The time when HOST mining ends.
     uint256 public poolEndTime;
 
-    // TESTNET
-    // uint256 public HOSTPerSecond = 3.0555555 ether; // 11000 HOST / (1h * 60min * 60s)
-    // uint256 public runningTime = 24 hours; // 1 hours
-    // uint256 public constant TOTAL_REWARDS = 11000 ether;
-    // END TESTNET
+    bool private isStartTimeSetted = false;
 
-    // MAINNET
-    uint256 public HOSTPerSecond; // 45000 HOST / (2*24h * 60min * 60s)
-    uint256 public runningTime; // 2 days
-    uint256 public constant TOTAL_REWARDS = 45000 ether;
-    // END MAINNET
+    uint public daoFee;
+    address public daoAddress;
 
-    event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
-    event SetFeeAddress(address indexed user, address indexed newAddress);
-    event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
-    event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
-    event RewardPaid(address indexed user, uint256 amount);
-    
-    bool public feeCheckerFunctionsDisabled;
-    bool public feeChecker;
     bool public isHumanOn; 
 
     function setIsHuman(bool _isHumanOn) public onlyOwner { 
@@ -109,6 +98,15 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
             require(tx.origin == msg.sender || !isHumanOn, "sorry humans only" )  ;
             _;
         }
+    // MAINNET
+     uint256 public HOSTPerSecond = 0.231481 ether; // 20000 HOST / (24h * 60min * 60s) 0.231481
+     uint256 public runningTime = 1 days; // 1 days
+    // END MAINNET
+
+    event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
+    event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
+    event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
+    event RewardPaid(address indexed user, uint256 amount);
 
      /* ========== TEST FUNCTIONS ========== */
     
@@ -145,25 +143,26 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
 
      /* ========== TEST FUNCTIONS END ========== */
 
-    // using openzepplin initializer
-
     function initialize(address _HOST,address _cake,address _feeAddress,uint256 _poolStartTime) public initializer {
         __Ownable_init();
         if (_HOST != address(0)) HOST = IERC20(_HOST);
         if (_cake != address(0)) cake = _cake;
-        runningTime = 2 days;
+        runningTime = 3 days;
         poolStartTime = _poolStartTime;
         poolEndTime = poolStartTime + runningTime;
         operator = msg.sender;
         functionsDisabled = false;
-        feeAddress = _feeAddress;
         totalAllocPoint = 0;
         HOSTPerSecond = 0.2604 ether;
         isHumanOn = true; 
         _status = _NOT_ENTERED;
         ReentrantOn = true; 
+        daoFee = 0;
+        daoAddress = address(0x0);
+
    
     }
+
     modifier onlyOperator() {
         require(operator == msg.sender, "HOSTGenesisPool: caller is not the operator");
         _;
@@ -181,12 +180,8 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
         uint256 _allocPoint,
         IERC20 _token,
         bool _withUpdate,
-        uint256 _lastRewardTime,
-        uint16  _depositFeeBP
-
+        uint256 _lastRewardTime
     ) public onlyOperator {
-        require(_depositFeeBP <= 400, "add: invalid deposit fee basis points");
-
         checkPoolDuplicate(_token);
         if (_withUpdate) {
             massUpdatePools();
@@ -206,25 +201,40 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
                 _lastRewardTime = block.timestamp;
             }
         }
-        bool _isStarted = (_lastRewardTime <= poolStartTime) || (_lastRewardTime <= block.timestamp);
-        poolInfo.push(PoolInfo({token: _token, allocPoint: _allocPoint, lastRewardTime: _lastRewardTime, accHOSTPerShare: 0, isStarted: _isStarted, depositFeeBP: _depositFeeBP}));
+        bool _isStarted =
+        (_lastRewardTime <= poolStartTime) ||
+        (_lastRewardTime <= block.timestamp);
+        poolInfo.push(PoolInfo({
+            token : _token,
+            allocPoint : _allocPoint,
+            lastRewardTime : _lastRewardTime,
+            accHOSTPerShare : 0,
+            isStarted : _isStarted
+            }));
         if (_isStarted) {
             totalAllocPoint = totalAllocPoint.add(_allocPoint);
         }
     }
 
     // Update the given pool's HOST allocation point. Can only be called by the owner.
-    function set(uint256 _pid, uint256 _allocPoint,  uint16 _depositFeeBP) public onlyOperator {
-        require(_depositFeeBP <= 400, "set: invalid deposit fee basis points");
+    function set(uint256 _pid, uint256 _allocPoint) public onlyOperator {
         massUpdatePools();
         PoolInfo storage pool = poolInfo[_pid];
         if (pool.isStarted) {
-            totalAllocPoint = totalAllocPoint.sub(pool.allocPoint).add(_allocPoint);
+            totalAllocPoint = totalAllocPoint.sub(pool.allocPoint).add(
+                _allocPoint
+            );
         }
         pool.allocPoint = _allocPoint;
-        poolInfo[_pid].depositFeeBP = _depositFeeBP;
     }
 
+    //Allow setStartTime after contract is deployed
+    function setStartTime(uint256 _poolStartTime) public onlyOperator onlyOne{
+        require(block.timestamp < _poolStartTime, "late");
+        isStartTimeSetted = true;
+        poolStartTime = _poolStartTime;
+        poolEndTime = poolStartTime + runningTime;
+    }
     // Return accumulate rewards over the given _from to _to block.
     function getGeneratedReward(uint256 _fromTime, uint256 _toTime) public view returns (uint256) {
         if (_fromTime >= _toTime) return 0;
@@ -284,37 +294,24 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
         pool.lastRewardTime = block.timestamp;
     }
 
-    modifier disableFeeChecker() {
-            require(!feeCheckerFunctionsDisabled, "function is permantly disabled!" )  ;
-            _;
-        }
-    
-    // disable the function setFeeChecker
-    function disableFeeCheckerFunctions() public onlyOwner { 
-            feeCheckerFunctionsDisabled = true; 
-        }
 
-    function setFeeChecker(bool falseForOn) public onlyOwner disableFeeChecker  { 
-            feeChecker = falseForOn; 
-        }
-    
+        mapping(address => bool) public feeLessTokens;
+
+    function addfeeLessToken(address _address, bool value) public onlyOwner {
+    feeLessTokens[_address] = value;
+    }
+
+
     // Deposit LP tokens.
-    function deposit(uint256 _pid, uint256 _amount)  public isHuman nonReentrant {
+    function deposit(uint256 _pid, uint256 _amount) public isHuman nonReentrant {
         address _sender = msg.sender;
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_sender];
         updatePool(_pid);
-        
-    // checking for transfer fee by sending 1000 wei from and to the user
-    if (feeChecker == false){
 
-    uint256 _totalTokenBefore = IERC20(pool.token).balanceOf(msg.sender); 
-    pool.token.safeTransferFrom(msg.sender, msg.sender, 1000);
-    uint256 _totalTokenAfter = IERC20(pool.token).balanceOf(msg.sender);
-    require(_totalTokenBefore == _totalTokenAfter, "token with fees not allowed!" );
-        }
+        // if not a feeLess token, account for fee
+        if (feeLessTokens[address(pool.token)] == false) {
 
-       
         if (user.amount > 0) {
             uint256 _pending = user.amount.mul(pool.accHOSTPerShare).div(1e18).sub(user.rewardDebt);
             if (_pending > 0) {
@@ -324,24 +321,59 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
         }
         if (_amount > 0) {
             pool.token.safeTransferFrom(_sender, address(this), _amount);
-            if (address(pool.token) == cake) {
-                user.amount = user.amount.add(_amount.mul(9900).div(10000));
-            } 
-             if (pool.depositFeeBP > 0) {
-                uint256 depositFee = _amount.mul(pool.depositFeeBP).div(10000);
-                pool.token.safeTransfer(feeAddress, depositFee);
-                // pool.lpToken.safeTransfer(vaultAddress, depositFee);
-                user.amount = user.amount.add(_amount).sub(depositFee);
-            }else {
-                user.amount = user.amount.add(_amount);
+
+            uint _fee = _amount.mul( daoFee ).div( 10000 );
+            pool.token.safeTransfer(daoAddress, _fee);
+            uint256 _amountSubFee = _amount.sub(_fee);
+
+            if(address(pool.token) == cake) {
+                user.amount = user.amount.add(_amountSubFee.mul(cakeTokenFee).div(10000));
+            } else {
+                user.amount = user.amount.add(_amountSubFee);
             }
         }
         user.rewardDebt = user.amount.mul(pool.accHOSTPerShare).div(1e18);
-        emit Deposit(_sender, _pid, _amount);
+        emit Deposit(_sender, _pid, _amount); }
+
+        // if token is feeLess
+
+        else  {
+        if (user.amount > 0) {
+            uint256 _pending = user.amount.mul(pool.accHOSTPerShare).div(1e18).sub(user.rewardDebt);
+            if (_pending > 0) {
+                safeHOSTTransfer(_sender, _pending);
+                emit RewardPaid(_sender, _pending);
+            }
+        }
+        if (_amount > 0) {
+            pool.token.safeTransferFrom(_sender, address(this), _amount);
+
+            uint _fee = 0;
+            // pool.token.safeTransfer(daoAddress, _fee);
+            uint256 _amountSubFee = _amount.sub(_fee);
+            if(address(pool.token) == cake) {
+                user.amount = user.amount.add(_amountSubFee.mul(cakeTokenFee).div(10000));
+            } else {
+                user.amount = user.amount.add(_amountSubFee);
+            }
+            }
+            user.rewardDebt = user.amount.mul(pool.accHOSTPerShare).div(1e18);
+            emit Deposit(_sender, _pid, _amount); }
+    }
+
+
+    uint256 public cakeTokenFee = 10000;
+
+    function setCakeTokenFee(uint256 cakeFee) public onlyOwner returns (uint256){
+        require(cakeFee <= 20 || cakeFee >= 0, "Max fee 20%");
+        uint256 feeToMath = (100 - cakeFee) * 100;
+        cakeTokenFee = feeToMath;
+        return cakeTokenFee;
+
     }
 
     // Withdraw LP tokens.
-    function withdraw(uint256 _pid, uint256 _amount) public isHuman nonReentrant{
+    function withdraw(uint256 _pid, uint256 _amount) public isHuman nonReentrant {
         address _sender = msg.sender;
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_sender];
@@ -361,7 +393,7 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
     }
 
     // Withdraw without caring about rewards. EMERGENCY ONLY.
-    function emergencyWithdraw(uint256 _pid) public isHuman nonReentrant{
+    function emergencyWithdraw(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][msg.sender];
         uint256 _amount = user.amount;
@@ -371,7 +403,7 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
         emit EmergencyWithdraw(msg.sender, _pid, _amount);
     }
 
-    // Safe HOST transfer function, just in case if rounding error causes pool to not have enough HOSTs.
+    // Safe HOST transfer function, just in case if rounding error causes pool to not have enough HOST.
     function safeHOSTTransfer(address _to, uint256 _amount) internal {
         uint256 _HOSTBalance = HOST.balanceOf(address(this));
         if (_HOSTBalance > 0) {
@@ -383,29 +415,19 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
         }
     }
 
-    function setFeeAddress(address _feeAddress) external onlyOperator {
-        feeAddress = _feeAddress;
-        emit SetFeeAddress(msg.sender, _feeAddress);
-    }
-
     function setOperator(address _operator) external onlyOperator {
         operator = _operator;
     }
 
-    function governanceRecoverUnsupported(
-        IERC20 _token,
-        uint256 amount,
-        address to
-    ) external onlyOperator {
-        if (block.timestamp < poolEndTime + 90 days) {
-            // do not allow to drain core token (HOST or lps) if less than 90 days after pool ends
-            require(_token != HOST, "HOST");
-            uint256 length = poolInfo.length;
-            for (uint256 pid = 0; pid < length; ++pid) {
-                PoolInfo storage pool = poolInfo[pid];
-                require(_token != pool.token, "pool.token");
-            }
-        }
-        _token.safeTransfer(to, amount);
+    function setDaoFee(address _address, uint _fee) external onlyOperator {
+        require(_fee <= 200, "Max fee 2%");
+        daoAddress = _address;
+        daoFee = _fee;
     }
+
+    //Make sure we can only set startTime 1 time
+    modifier onlyOne {
+      require(!isStartTimeSetted);
+      _;
+   }
 }

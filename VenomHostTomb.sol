@@ -1,4 +1,5 @@
  // SPDX-License-Identifier: MIT
+ // Venom-Finance v2
 
 pragma solidity >=0.8.14;
 
@@ -30,7 +31,6 @@ contract VenomHostTomb is ERC20Burnable {
     address public VhostOracle;
     // Address of the Tax Office
     address public taxOffice;
- 
     // Current tax rate
     uint256 public taxRate;
     // Price threshold below which taxes will get burned
