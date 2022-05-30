@@ -30,7 +30,7 @@ contract VenomHostTomb is ERC20Burnable {
     address public VhostOracle;
     // Address of the Tax Office
     address public taxOffice;
-
+ 
     // Current tax rate
     uint256 public taxRate;
     // Price threshold below which taxes will get burned
@@ -91,7 +91,7 @@ contract VenomHostTomb is ERC20Burnable {
      */
     constructor(uint256 _taxRate, address _taxCollectorAddress) ERC20("HOST", "HOST") {
         // Mints 1 HOST to contract creator for initial pool setup
-        require(_taxRate < 10000, "tax equal or bigger to 100%");
+        require(_taxRate < 2100, "tax equal or bigger to 21%");
         require(_taxCollectorAddress != address(0), "tax collector address must be non-zero address");
         _operator = _msgSender();
         emit OperatorTransferred(address(0), _operator);
@@ -151,7 +151,7 @@ contract VenomHostTomb is ERC20Burnable {
         if (autoCalculateTax) {
             for (uint8 tierId = uint8(getTaxTiersTwapsCount()).sub(1); tierId >= 0; --tierId) {
                 if (_VhostPrice >= taxTiersTwaps[tierId]) {
-                    require(taxTiersRates[tierId] < 10000, "tax equal or bigger to 100%");
+                    require(taxTiersRates[tierId] < 2100, "tax equal or bigger to 21%");
                     taxRate = taxTiersRates[tierId];
                     return taxTiersRates[tierId];
                 }
@@ -185,7 +185,7 @@ contract VenomHostTomb is ERC20Burnable {
 
     function setTaxRate(uint256 _taxRate) public onlyTaxOffice {
         require(!autoCalculateTax, "auto calculate tax cannot be enabled");
-        require(_taxRate < 10000, "tax equal or bigger to 100%");
+        require(_taxRate < 2100, "tax equal or bigger to 21%");
         taxRate = _taxRate;
     }
 
