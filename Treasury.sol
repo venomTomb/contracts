@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Venom-Finance v2
+// Venom-Finance v7
 
 pragma solidity >=0.8.14;
 
@@ -27,7 +27,6 @@ contract Treasury is ContractGuard, Initializable, OwnableUpgradeable {
 
     uint256 public constant PERIOD = 6 hours;
 
-    /* ========== STATE VARIABLES ========== */
 
     // governance
     address public operator;
@@ -76,7 +75,6 @@ contract Treasury is ContractGuard, Initializable, OwnableUpgradeable {
     uint256 public premiumPercent;
     uint256 public mintingFactorForPayingDebt; // print extra HOST during debt phase
     bool public isHumanOn; 
-    bool public functionsDisabled;
     
     address public daoFund;
     uint256 public daoFundSharedPercent;
@@ -118,15 +116,11 @@ contract Treasury is ContractGuard, Initializable, OwnableUpgradeable {
     }
 
     modifier checkOperator() {
-        require(
-            IBasisAsset(HOST).operator() == address(this) &&
-                IBasisAsset(bbond).operator() == address(this) &&
-                IBasisAsset(bshare).operator() == address(this) &&
-                Operator(boardroom).operator() == address(this),
-            "Treasury: need more permission"
-        );
-
-        _;
+        require(IBasisAsset(HOST).operator() == address(this),"Treasury: need more permission from HOST");
+        require(IBasisAsset(bbond).operator() == address(this),"Treasury: need more permission from bbond");
+        require(IBasisAsset(bshare).operator() == address(this),"Treasury: need more permission from bshare");
+        require(Operator(boardroom).operator() == address(this),"Treasury: need more permission from boardroom");
+       _;
     }
 
     // epoch
@@ -226,31 +220,6 @@ contract Treasury is ContractGuard, Initializable, OwnableUpgradeable {
             require(tx.origin == msg.sender || !isHumanOn, "sorry humans only" )  ;
             _;
         }
-
-
-    /* ========== TEST FUNCTIONS ========== */
-
-    modifier disable() {
-            require(!functionsDisabled, "function is permantly disabled!" )  ;
-            _;
-        }
-    
-    // Theses function cant never be used if functionsDisabled is set to true
-    function disableFunctions() public onlyOwner { 
-            functionsDisabled = true; 
-        }
-
-    function setStartTime(uint256 _startTime) public onlyOwner disable { 
-            startTime = _startTime; 
-        }
-
-    function setTokens(address _HOST, address _bbond,address _bshare) public onlyOwner disable { 
-        HOST = _HOST;
-        bbond = _bbond;
-        bshare = _bshare;
-    }
-
-     /* ========== TEST FUNCTIONS END ========== */
 
     // using openzepplin modifier
     

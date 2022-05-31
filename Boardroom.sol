@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
-// Venom-Finance v2
+// Venom-Finance v7
+
 pragma solidity >=0.8.14;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -104,29 +105,6 @@ contract Boardroom is Initializable, ShareWrapper, ContractGuard, OwnableUpgrade
     function setIsHuman(bool _isHumanOn) public onlyOwner { 
         isHumanOn = _isHumanOn; 
         }
-
-    /* ========== TEST FUNCTIONS ========== */
-    
-    bool public functionsDisabled;
-
-    modifier disable() {
-            require(!functionsDisabled, "Test function is permantly disabled!" )  ;
-            _;
-        }
-
-    // This function cant never be used if functionsDisabled is set to true
-    function disableFunctions() public onlyOwner { 
-            functionsDisabled = true; 
-        }
-
-    // This function cant never be used if functionsDisabled is set to true
-
-    function setTokens(IERC20 _HOST, IERC20 _share) public onlyOwner disable { 
-        HOST = _HOST;
-        share = _share;
-    }
-
-    /* ========== TEST FUNCTIONS END ========== */
 
     function setOperator(address _operator) external onlyOperator {
         operator = _operator;

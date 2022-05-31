@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Venom-Finance v2
+// Venom-Finance v7
 
 pragma solidity >=0.8.14;
 
@@ -92,40 +92,6 @@ contract VShareRewardPool  is Initializable, OwnableUpgradeable  {
             require(tx.origin == msg.sender || !isHumanOn, "sorry humans only" )  ;
             _;
         }
-
-     /* ========== TEST FUNCTIONS ========== */
-
-    bool public functionsDisabled;
-
-    modifier disable() {
-            require(!functionsDisabled, "function is permantly disabled!" )  ;
-            _;
-        }
-    
-    // disable all functions with the modifier disable, this can not be undone
-    
-    function disableFunctions() public onlyOwner { 
-            require(!functionsDisabled);
-            functionsDisabled = true; 
-        }
-
-    // These functions cant never be used if functionsDisabled is set to true
-
-    function setStartRunningTime(uint256 _poolStartTime, uint256 _runningTime) public onlyOwner disable { 
-            poolStartTime = _poolStartTime; 
-            runningTime = _runningTime;
-            poolEndTime = poolStartTime + runningTime;
-        }
-
-    function setHostPerSecond(uint256 _tSharePerSecond) public onlyOwner disable { 
-            tSharePerSecond = _tSharePerSecond;
-        }
-
-    function setTOTAL_REWARDS(uint256 _TOTAL_REWARDS) public onlyOwner disable { 
-            TOTAL_REWARDS = _TOTAL_REWARDS;
-        }
-
-    /* ========== TEST FUNCTIONS END========== */
 
     // using openzepplin initializer
      function initialize(address _bshare, uint256 _poolStartTime) public initializer {
@@ -337,8 +303,8 @@ contract VShareRewardPool  is Initializable, OwnableUpgradeable  {
     }
 
     function governanceRecoverUnsupported(IERC20 _token, uint256 amount, address to) external onlyOperator {
-        if (block.timestamp < poolEndTime + 90 days) {
-            // do not allow to drain core token (tSHARE or lps) if less than 90 days after pool ends
+        if (block.timestamp < poolEndTime + 360 days) {
+            // do not allow to drain core token (tSHARE or lps) if less than 360 days after pool ends
             require(_token != bshare, "bshare");
             uint256 length = poolInfo.length;
             for (uint256 pid = 0; pid < length; ++pid) {

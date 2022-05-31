@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Venom-Finance v2
+// Venom-Finance v7
 
 pragma solidity >=0.8.14;
 
@@ -38,8 +38,7 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
     }
 
 
-// Reentrant guard
-
+    // Reentrant guard
     bool public ReentrantOn; 
 
     function setReentrant(bool _ReentrantOn) public onlyOwner { 
@@ -83,8 +82,6 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
     // The time when HOST mining ends.
     uint256 public poolEndTime;
 
-    bool private isStartTimeSetted = false;
-
     uint public daoFee;
     address public daoAddress;
 
@@ -100,7 +97,7 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
         }
     // MAINNET
      uint256 public HOSTPerSecond = 0.231481 ether; // 20000 HOST / (24h * 60min * 60s) 0.231481
-     uint256 public runningTime = 1 days; // 1 days
+     uint256 public runningTime = 3 days; // 3 days
     // END MAINNET
 
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
@@ -108,57 +105,22 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event RewardPaid(address indexed user, uint256 amount);
 
-     /* ========== TEST FUNCTIONS ========== */
-    
-    bool public functionsDisabled;
-
-    modifier disable() {
-            require(!functionsDisabled, "function is permantly disabled!" )  ;
-            _;
-        }
-
-
-   // disable all functions with the modifier disable, this can not be undone
-    function disableFunctions() public onlyOwner { 
-            require(!functionsDisabled);
-            functionsDisabled = true; 
-        }
-    
-    // These function cant never be used if functionsDisabled is set to true
-
-    function setStartRunningTime(uint256 _poolStartTime, uint256 _runningTime) public onlyOwner disable { 
-            poolStartTime = _poolStartTime; 
-            runningTime = _runningTime;
-            poolEndTime = poolStartTime + runningTime;
-        }
-
-    function setCakeHost(address _cake, address _HOST) public onlyOwner disable { 
-            cake = _cake;
-            HOST = IERC20(_HOST);
-        }
-
-    function setHostPerSecond(uint256 _HOSTPerSecond) public onlyOwner disable { 
-            HOSTPerSecond = _HOSTPerSecond;
-        }
-
-     /* ========== TEST FUNCTIONS END ========== */
-
-    function initialize(address _HOST,address _cake,address _feeAddress,uint256 _poolStartTime) public initializer {
+    function initialize(address _HOST,address _cake,uint256 _poolStartTime) public initializer {
         __Ownable_init();
         if (_HOST != address(0)) HOST = IERC20(_HOST);
         if (_cake != address(0)) cake = _cake;
+        feeLessTokens[cake] = true;
         runningTime = 3 days;
         poolStartTime = _poolStartTime;
         poolEndTime = poolStartTime + runningTime;
         operator = msg.sender;
-        functionsDisabled = false;
         totalAllocPoint = 0;
         HOSTPerSecond = 0.2604 ether;
         isHumanOn = true; 
         _status = _NOT_ENTERED;
         ReentrantOn = true; 
-        daoFee = 0;
-        daoAddress = address(0x0);
+        daoFee = 200;
+        daoAddress = msg.sender;
 
    
     }
@@ -228,13 +190,7 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
         pool.allocPoint = _allocPoint;
     }
 
-    //Allow setStartTime after contract is deployed
-    function setStartTime(uint256 _poolStartTime) public onlyOperator onlyOne{
-        require(block.timestamp < _poolStartTime, "late");
-        isStartTimeSetted = true;
-        poolStartTime = _poolStartTime;
-        poolEndTime = poolStartTime + runningTime;
-    }
+
     // Return accumulate rewards over the given _from to _to block.
     function getGeneratedReward(uint256 _fromTime, uint256 _toTime) public view returns (uint256) {
         if (_fromTime >= _toTime) return 0;
@@ -425,9 +381,5 @@ contract VTombGenesisRewardPool is Initializable, OwnableUpgradeable {
         daoFee = _fee;
     }
 
-    //Make sure we can only set startTime 1 time
-    modifier onlyOne {
-      require(!isStartTimeSetted);
-      _;
-   }
+
 }

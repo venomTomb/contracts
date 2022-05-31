@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Venom-Finance v2
+// Venom-Finance v7
 
 pragma solidity >=0.8.14;
 
@@ -11,7 +11,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./supportContracts/Operator.sol";
 
-contract SymbiotShare is ERC20Burnable, Operator {
+contract SymbiotShare is ERC20Burnable, Operator, Ownable {
     using SafeMath for uint256;
 
     // TOTAL MAX SUPPLY = 60,000 tSHAREs
@@ -29,36 +29,6 @@ contract SymbiotShare is ERC20Burnable, Operator {
     uint256 public devFundLastClaimed;
     bool public rewardPoolDistributed = false;
     
-     /* ============================== TEST FUNCTIONS ============================== */
-    
-    bool public functionsDisabled;
-
-    modifier disable() {
-            require(!functionsDisabled, "function is permantly disabled!" )  ;
-            _;
-        }
-    
-    // disable all functions with the modifier disable, this can not be undone
-
-    function disableFunctions() public onlyOwner { 
-            require(!functionsDisabled);
-            functionsDisabled = true; 
-        }
-    
-    // This function cant never be used if functionsDisabled is set to true
-
-    function setStartTime(uint256 _startTime) public onlyOwner disable { 
-            startTime = _startTime; 
-            endTime = startTime + VESTING_DURATION;
-
-            communityFundLastClaimed = startTime;
-            devFundLastClaimed = startTime;
-
-
-        }
-
-     /* ============================== TEST FUNCTIONS END ============================== */
-
     constructor(address _communityFund, address _devFund,uint256 _startTime) ERC20("SYMBIOT", "SYMBIOT") {
         _mint(msg.sender, 1 ether); // mint 1 HOST Share for initial pools deployment
 

@@ -1,5 +1,5 @@
  // SPDX-License-Identifier: MIT
- // Venom-Finance v2
+ // Venom-Finance v7
 
 pragma solidity >=0.8.14;
 
@@ -13,7 +13,7 @@ import "./supportContracts/Math.sol";
 import "./supportContracts/SafeMath8.sol";
 import "./supportContracts/IOracle.sol";
 
-contract VenomHostTomb is ERC20Burnable {
+contract VenomHostTomb is ERC20Burnable, Ownable {
     using SafeMath8 for uint8;
     using SafeMath for uint256;
 
@@ -77,7 +77,7 @@ contract VenomHostTomb is ERC20Burnable {
         return _msgSender() == _operator;
     }
 
-    function transferOperator(address newOperator_) public onlyOperator {
+    function transferOperator(address newOperator_) public onlyOwner {
         _transferOperator(newOperator_);
     }
 

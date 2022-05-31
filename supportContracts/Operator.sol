@@ -7,7 +7,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Context.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
-abstract contract Operator is Context, Ownable, Initializable {
+abstract contract Operator is Context, Initializable {
     address private _operator;
 
     event OperatorTransferred(address indexed previousOperator, address indexed newOperator);
@@ -32,7 +32,7 @@ abstract contract Operator is Context, Ownable, Initializable {
         return _msgSender() == _operator;
     }
 
-    function transferOperator(address newOperator_) public onlyOwner {
+    function transferOperator(address newOperator_) public onlyOperator {
         _transferOperator(newOperator_);
     }
 
